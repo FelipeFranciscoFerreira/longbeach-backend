@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: longbeach-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: longbeach_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d longbeach_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - longbeach-net
+
+  backend-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: longbeach-backend-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=longbeach_db
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/longbeach_db
+      - SYNC_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/longbeach_db
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - longbeach-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  longbeach-net:
+    driver: bridge
